@@ -12,6 +12,7 @@ import {
 import { User } from "../entities/Users";
 import argon2 from "argon2";
 import EmailValidator from "email-validator";
+import { EntityManager } from "@mikro-orm/postgresql";
 
 @InputType()
 class EmailPasswordInput {
@@ -77,17 +78,20 @@ export class UserResolver {
     }
 
     const hashedPassword = await argon2.hash(options.password);
-    const newUser = em.create(User, {
-      username: options.username.toLowerCase(),
-      password: hashedPassword,
-    });
+    let user;
 
     try {
-      await em.persistAndFlush(newUser);
-      req.session.userId = newUser.id;
-      return {
-        user: newUser,
-      };
+      const result = await (em as EntityManager)
+        .createQueryBuilder(User)
+        .getKnexQuery()
+        .insert({
+          username: options.username,
+          password: hashedPassword,
+          created_at: new Date(),
+          updated_at: new Date(),
+        })
+        .returning("*");
+      user = result[0];
     } catch (err) {
       if (
         err.message.includes(
@@ -105,6 +109,9 @@ export class UserResolver {
         };
       }
     }
+    return {
+      user,
+    };
   }
 
   @Query(() => [User])

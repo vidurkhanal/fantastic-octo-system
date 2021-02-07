@@ -101,16 +101,19 @@ let UserResolver = class UserResolver {
                 };
             }
             const hashedPassword = yield argon2_1.default.hash(options.password);
-            const newUser = em.create(Users_1.User, {
-                username: options.username.toLowerCase(),
-                password: hashedPassword,
-            });
+            let user;
             try {
-                yield em.persistAndFlush(newUser);
-                req.session.userId = newUser.id;
-                return {
-                    user: newUser,
-                };
+                const result = yield em
+                    .createQueryBuilder(Users_1.User)
+                    .getKnexQuery()
+                    .insert({
+                    username: options.username,
+                    password: hashedPassword,
+                    created_at: new Date(),
+                    updated_at: new Date(),
+                })
+                    .returning("*");
+                user = result[0];
             }
             catch (err) {
                 if (err.message.includes(`returning "id" - duplicate key value violates unique constraint "user_username_unique"`)) {
@@ -124,6 +127,9 @@ let UserResolver = class UserResolver {
                     };
                 }
             }
+            return {
+                user,
+            };
         });
     }
     AllUsers({ em }) {
