@@ -168,6 +168,19 @@ let UserResolver = class UserResolver {
             return { user };
         });
     }
+    logout({ req, res }) {
+        return new Promise((resolve) => {
+            req.session.destroy((err) => {
+                if (err) {
+                    console.log(err.message);
+                    resolve(false);
+                    return;
+                }
+                res.clearCookie("braketid");
+                resolve(true);
+            });
+        });
+    }
 };
 __decorate([
     type_graphql_1.Query(() => Users_1.User, { nullable: true }),
@@ -199,6 +212,13 @@ __decorate([
     __metadata("design:paramtypes", [EmailPasswordInput, Object]),
     __metadata("design:returntype", Promise)
 ], UserResolver.prototype, "login", null);
+__decorate([
+    type_graphql_1.Mutation(() => Boolean),
+    __param(0, type_graphql_1.Ctx()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object]),
+    __metadata("design:returntype", void 0)
+], UserResolver.prototype, "logout", null);
 UserResolver = __decorate([
     type_graphql_1.Resolver()
 ], UserResolver);
