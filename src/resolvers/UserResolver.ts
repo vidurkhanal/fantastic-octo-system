@@ -13,6 +13,7 @@ import { User } from "../entities/Users";
 import argon2 from "argon2";
 import EmailValidator from "email-validator";
 import { EntityManager } from "@mikro-orm/postgresql";
+import { COOKIE_NAME } from "../constants";
 
 @InputType()
 class EmailPasswordInput {
@@ -164,13 +165,13 @@ export class UserResolver {
   logout(@Ctx() { req, res }: MyContext) {
     return new Promise((resolve) => {
       req.session.destroy((err) => {
+        res.clearCookie(COOKIE_NAME);
         if (err) {
           console.log(err.message);
           resolve(false);
           return;
         }
 
-        res.clearCookie("braketid");
         resolve(true);
       });
     });

@@ -1,7 +1,7 @@
 import { MikroORM } from "@mikro-orm/core";
 import mikroOrmConfig from "./mikro-orm.config";
 import express from "express";
-import { PORT, __prod__ } from "./constants";
+import { COOKIE_NAME, PORT, __prod__ } from "./constants";
 import { ApolloServer } from "apollo-server-express";
 import { buildSchema } from "type-graphql";
 import { HelloResolver } from "./resolvers/HelloResolver";
@@ -24,7 +24,7 @@ const main = async () => {
   app.use(cors({ origin: "http://localhost:3000", credentials: true }));
   app.use(
     session({
-      name: "braketid",
+      name: COOKIE_NAME,
       store: new RedisStore({
         client: redisClient,
         disableTouch: true,

@@ -29,6 +29,7 @@ const type_graphql_1 = require("type-graphql");
 const Users_1 = require("../entities/Users");
 const argon2_1 = __importDefault(require("argon2"));
 const email_validator_1 = __importDefault(require("email-validator"));
+const constants_1 = require("../constants");
 let EmailPasswordInput = class EmailPasswordInput {
 };
 __decorate([
@@ -171,12 +172,12 @@ let UserResolver = class UserResolver {
     logout({ req, res }) {
         return new Promise((resolve) => {
             req.session.destroy((err) => {
+                res.clearCookie(constants_1.COOKIE_NAME);
                 if (err) {
                     console.log(err.message);
                     resolve(false);
                     return;
                 }
-                res.clearCookie("braketid");
                 resolve(true);
             });
         });
