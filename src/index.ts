@@ -34,7 +34,7 @@ const main = async () => {
       cookie: {
         maxAge: 1000 * 60 * 60 * 24 * 365 * 10,
         sameSite: "lax",
-        httpOnly: true, //CAN't BE ACCESSED BY FRONTEND
+        httpOnly: true, //CAN'T BE ACCESSED BY FRONTEND
         secure: __prod__, // NEEDS SECURED DOMAIN IN PROD
       },
       secret: "5dcf8b3fd3fff6d26ffee039f6890300",
