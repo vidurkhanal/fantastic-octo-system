@@ -13,7 +13,9 @@ import { User } from "../entities/Users";
 import argon2 from "argon2";
 import EmailValidator from "email-validator";
 import { EntityManager } from "@mikro-orm/postgresql";
-import { COOKIE_NAME } from "../constants";
+import { COOKIE_NAME, FORGOT_PASSWORD_PREFIX } from "../constants";
+import { sendEmail } from "../sendEmail";
+import { v4 } from "uuid";
 
 @InputType()
 class EmailPasswordInput {
@@ -50,10 +52,36 @@ export class UserResolver {
     return user;
   }
 
+  @Mutation(() => Boolean)
+  async forgotPwd(
+    @Arg("email") email: string,
+    @Ctx() { em, redis }: MyContext
+  ) {
+    const user = await em.findOne(User, { username: email });
+    if (!user) {
+      return true;
+    }
+
+    const token = v4();
+    await redis.set(
+      FORGOT_PASSWORD_PREFIX + token,
+      user.id,
+      "ex",
+      1000 * 60 * 60 * 24 * 3
+    );
+
+    await sendEmail(
+      email,
+      `<a href="http://localhost:3000/change-password/${token}" target="_blank"> Reset your Password</a>`
+    );
+
+    return true;
+  }
+
   @Mutation(() => AuthResponse)
   async RegisterUser(
     @Arg("options") options: EmailPasswordInput,
-    @Ctx() { em, req }: MyContext
+    @Ctx() { em }: MyContext
   ): Promise<AuthResponse> {
     if (!EmailValidator.validate(options.username)) {
       return {
