@@ -58,11 +58,11 @@ export class UserResolver {
     @Arg("newPassword") newPassword: string,
     @Ctx() { em, redis }: MyContext
   ): Promise<AuthResponse> {
-    if (newPassword.length < 5) {
+    if (newPassword.length <= 5) {
       return {
         error: [
           {
-            field: "Password",
+            field: "newPassword",
             message:
               "Provided Password Is Too Short. Please Type A New Password",
           },
@@ -70,7 +70,8 @@ export class UserResolver {
       };
     }
 
-    const userId = await redis.get(FORGOT_PASSWORD_PREFIX + token);
+    const key = FORGOT_PASSWORD_PREFIX + token;
+    const userId = await redis.get(key);
     if (!userId) {
       return {
         error: [
@@ -82,7 +83,7 @@ export class UserResolver {
       };
     }
 
-    const user = await em.findOne(User, { id: Number(userId) });
+    const user = await em.findOne(User, { id: parseInt(userId) });
     if (!user) {
       return {
         error: [
@@ -97,6 +98,7 @@ export class UserResolver {
     user.password = await argon2.hash(newPassword);
 
     await em.persistAndFlush(user);
+    await redis.del(key);
 
     return { user };
   }
