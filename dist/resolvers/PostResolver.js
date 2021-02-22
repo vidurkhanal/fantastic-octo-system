@@ -24,37 +24,44 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.PostResolver = void 0;
 const Post_1 = require("../entities/Post");
 const type_graphql_1 = require("type-graphql");
+const typeorm_1 = require("typeorm");
 let PostResolver = class PostResolver {
-    AllPosts({ em }) {
-        return em.find(Post_1.Post, {});
+    AllPosts() {
+        return Post_1.Post.find();
     }
-    PostById(id, { em }) {
-        return em.findOne(Post_1.Post, { id });
+    PostById(id) {
+        return Post_1.Post.findOne(id);
     }
-    CreatePost(title, { em }) {
+    CreatePost(title) {
         return __awaiter(this, void 0, void 0, function* () {
-            const post = em.create(Post_1.Post, { title });
-            em.persistAndFlush(post);
-            return post;
+            const result = yield typeorm_1.getConnection()
+                .createQueryBuilder()
+                .insert()
+                .into(Post_1.Post)
+                .values({
+                title,
+            })
+                .returning("*")
+                .execute();
+            return result.raw[0];
         });
     }
-    UpdatePost(newTitle, id, { em }) {
+    UpdatePost(newTitle, id) {
         return __awaiter(this, void 0, void 0, function* () {
-            const post = yield em.findOne(Post_1.Post, { id });
+            const post = yield Post_1.Post.findOne(id);
             if (!post) {
                 return null;
             }
             if (typeof newTitle !== "undefined") {
-                post.title = newTitle;
+                Post_1.Post.update({ id }, { title: newTitle });
             }
-            em.persistAndFlush(post);
             return post;
         });
     }
-    DeletePost(id, { em }) {
+    DeletePost(id) {
         return __awaiter(this, void 0, void 0, function* () {
             try {
-                yield em.nativeDelete(Post_1.Post, { id });
+                yield Post_1.Post.delete(id);
                 return true;
             }
             catch (e) {
@@ -65,42 +72,37 @@ let PostResolver = class PostResolver {
 };
 __decorate([
     type_graphql_1.Query(() => [Post_1.Post]),
-    __param(0, type_graphql_1.Ctx()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [Object]),
+    __metadata("design:paramtypes", []),
     __metadata("design:returntype", Promise)
 ], PostResolver.prototype, "AllPosts", null);
 __decorate([
     type_graphql_1.Query(() => Post_1.Post, { nullable: true }),
     __param(0, type_graphql_1.Arg("id")),
-    __param(1, type_graphql_1.Ctx()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [Number, Object]),
+    __metadata("design:paramtypes", [Number]),
     __metadata("design:returntype", Promise)
 ], PostResolver.prototype, "PostById", null);
 __decorate([
     type_graphql_1.Mutation(() => Post_1.Post),
     __param(0, type_graphql_1.Arg("title")),
-    __param(1, type_graphql_1.Ctx()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, Object]),
+    __metadata("design:paramtypes", [String]),
     __metadata("design:returntype", Promise)
 ], PostResolver.prototype, "CreatePost", null);
 __decorate([
     type_graphql_1.Mutation(() => Post_1.Post),
     __param(0, type_graphql_1.Arg("newTitle", { nullable: true })),
     __param(1, type_graphql_1.Arg("id")),
-    __param(2, type_graphql_1.Ctx()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, Number, Object]),
+    __metadata("design:paramtypes", [String, Number]),
     __metadata("design:returntype", Promise)
 ], PostResolver.prototype, "UpdatePost", null);
 __decorate([
     type_graphql_1.Mutation(() => Boolean),
     __param(0, type_graphql_1.Arg("id")),
-    __param(1, type_graphql_1.Ctx()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [Number, Object]),
+    __metadata("design:paramtypes", [Number]),
     __metadata("design:returntype", Promise)
 ], PostResolver.prototype, "DeletePost", null);
 PostResolver = __decorate([

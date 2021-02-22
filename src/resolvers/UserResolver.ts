@@ -12,10 +12,10 @@ import {
 import { User } from "../entities/Users";
 import argon2 from "argon2";
 import EmailValidator from "email-validator";
-import { EntityManager } from "@mikro-orm/postgresql";
 import { COOKIE_NAME, FORGOT_PASSWORD_PREFIX } from "../constants";
 import { sendEmail } from "../sendEmail";
 import { v4 } from "uuid";
+import { getConnection } from "typeorm";
 
 @InputType()
 class EmailPasswordInput {
@@ -44,19 +44,18 @@ class AuthResponse {
 @Resolver()
 export class UserResolver {
   @Query(() => User, { nullable: true })
-  async me(@Ctx() { em, req }: MyContext) {
+  me(@Ctx() { req }: MyContext) {
     if (!req.session.userId) {
       return null;
     }
-    const user = await em.findOne(User, { id: req.session.userId });
-    return user;
+    return User.findOne({ id: req.session.userId });
   }
 
   @Mutation(() => AuthResponse)
   async changePassword(
     @Arg("token") token: string,
     @Arg("newPassword") newPassword: string,
-    @Ctx() { em, redis }: MyContext
+    @Ctx() { redis }: MyContext
   ): Promise<AuthResponse> {
     if (newPassword.length <= 5) {
       return {
@@ -83,7 +82,8 @@ export class UserResolver {
       };
     }
 
-    const user = await em.findOne(User, { id: parseInt(userId) });
+    const ProvideId = parseInt(userId);
+    const user = await User.findOne({ id: ProvideId });
     if (!user) {
       return {
         error: [
@@ -95,20 +95,18 @@ export class UserResolver {
       };
     }
 
-    user.password = await argon2.hash(newPassword);
-
-    await em.persistAndFlush(user);
+    User.update(
+      { id: ProvideId },
+      { password: await argon2.hash(newPassword) }
+    );
     await redis.del(key);
 
-    return { user };
+    return { user, error: undefined };
   }
 
   @Mutation(() => Boolean)
-  async forgotPwd(
-    @Arg("email") email: string,
-    @Ctx() { em, redis }: MyContext
-  ) {
-    const user = await em.findOne(User, { username: email });
+  async forgotPwd(@Arg("email") email: string, @Ctx() { redis }: MyContext) {
+    const user = await User.findOne({ where: { username: email } });
     if (!user) {
       return true;
     }
@@ -131,8 +129,7 @@ export class UserResolver {
 
   @Mutation(() => AuthResponse)
   async RegisterUser(
-    @Arg("options") options: EmailPasswordInput,
-    @Ctx() { em }: MyContext
+    @Arg("options") options: EmailPasswordInput
   ): Promise<AuthResponse> {
     if (!EmailValidator.validate(options.username)) {
       return {
@@ -161,29 +158,25 @@ export class UserResolver {
     let user;
 
     try {
-      const result = await (em as EntityManager)
-        .createQueryBuilder(User)
-        .getKnexQuery()
-        .insert({
+      const result = await getConnection()
+        .createQueryBuilder()
+        .insert()
+        .into(User)
+        .values({
           username: options.username,
           password: hashedPassword,
-          created_at: new Date(),
-          updated_at: new Date(),
         })
-        .returning("*");
-      user = result[0];
+        .returning("*")
+        .execute();
+
+      user = result.raw[0];
     } catch (err) {
-      if (
-        err.message.includes(
-          `returning "id" - duplicate key value violates unique constraint "user_username_unique"`
-        )
-      ) {
+      if (err.code === "23505") {
         return {
           error: [
             {
               field: "username",
-              message:
-                "Provided email is already assosciated with another account.",
+              message: "username already taken",
             },
           ],
         };
@@ -191,22 +184,24 @@ export class UserResolver {
     }
     return {
       user,
+      error: undefined,
     };
   }
 
   @Query(() => [User])
-  async AllUsers(@Ctx() { em }: MyContext) {
-    const users = await em.find(User, {});
-    return users;
+  async AllUsers() {
+    return User.find();
   }
 
   @Mutation(() => AuthResponse)
   async login(
     @Arg("options") options: EmailPasswordInput,
-    @Ctx() { em, req }: MyContext
+    @Ctx() { req }: MyContext
   ): Promise<AuthResponse> {
-    const user = await em.findOne(User, {
-      username: options.username.toLowerCase(),
+    const user = await User.findOne({
+      where: {
+        username: options.username.toLowerCase(),
+      },
     });
     if (!user) {
       return {

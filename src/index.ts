@@ -1,5 +1,4 @@
-import { MikroORM } from "@mikro-orm/core";
-import mikroOrmConfig from "./mikro-orm.config";
+import "reflect-metadata";
 import express from "express";
 import { COOKIE_NAME, PORT, __prod__ } from "./constants";
 import { ApolloServer } from "apollo-server-express";
@@ -12,10 +11,20 @@ import session from "express-session";
 import connectRedis from "connect-redis";
 import { MyContext } from "./types";
 import cors from "cors";
+import { createConnection } from "typeorm";
+import { Post } from "./entities/Post";
+import { User } from "./entities/Users";
 
 const main = async () => {
-  const orm = await MikroORM.init(mikroOrmConfig);
-  await orm.getMigrator().up();
+  const conn = await createConnection({
+    type: "postgres",
+    database: "lrddr2",
+    username: "postgres",
+    password: "postgres",
+    logging: true,
+    synchronize: true,
+    entities: [Post, User],
+  });
 
   const app = express();
   let RedisStore = connectRedis(session);
@@ -26,6 +35,7 @@ const main = async () => {
     session({
       name: COOKIE_NAME,
       store: new RedisStore({
+        // @ts-ignore
         client: redis,
         disableTouch: true,
         disableTTL: true,
@@ -47,7 +57,7 @@ const main = async () => {
       resolvers: [HelloResolver, PostResolver, UserResolver],
       validate: false,
     }),
-    context: ({ req, res }): MyContext => ({ em: orm.em, req, res, redis }),
+    context: ({ req, res }): MyContext => ({ req, res, redis }),
   });
 
   apolloServer.applyMiddleware({

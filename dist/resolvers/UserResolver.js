@@ -32,6 +32,7 @@ const email_validator_1 = __importDefault(require("email-validator"));
 const constants_1 = require("../constants");
 const sendEmail_1 = require("../sendEmail");
 const uuid_1 = require("uuid");
+const typeorm_1 = require("typeorm");
 let EmailPasswordInput = class EmailPasswordInput {
 };
 __decorate([
@@ -72,16 +73,13 @@ AuthResponse = __decorate([
     type_graphql_1.ObjectType()
 ], AuthResponse);
 let UserResolver = class UserResolver {
-    me({ em, req }) {
-        return __awaiter(this, void 0, void 0, function* () {
-            if (!req.session.userId) {
-                return null;
-            }
-            const user = yield em.findOne(Users_1.User, { id: req.session.userId });
-            return user;
-        });
+    me({ req }) {
+        if (!req.session.userId) {
+            return null;
+        }
+        return Users_1.User.findOne({ id: req.session.userId });
     }
-    changePassword(token, newPassword, { em, redis }) {
+    changePassword(token, newPassword, { redis }) {
         return __awaiter(this, void 0, void 0, function* () {
             if (newPassword.length <= 5) {
                 return {
@@ -105,7 +103,8 @@ let UserResolver = class UserResolver {
                     ],
                 };
             }
-            const user = yield em.findOne(Users_1.User, { id: parseInt(userId) });
+            const ProvideId = parseInt(userId);
+            const user = yield Users_1.User.findOne({ id: ProvideId });
             if (!user) {
                 return {
                     error: [
@@ -116,15 +115,14 @@ let UserResolver = class UserResolver {
                     ],
                 };
             }
-            user.password = yield argon2_1.default.hash(newPassword);
-            yield em.persistAndFlush(user);
+            Users_1.User.update({ id: ProvideId }, { password: yield argon2_1.default.hash(newPassword) });
             yield redis.del(key);
-            return { user };
+            return { user, error: undefined };
         });
     }
-    forgotPwd(email, { em, redis }) {
+    forgotPwd(email, { redis }) {
         return __awaiter(this, void 0, void 0, function* () {
-            const user = yield em.findOne(Users_1.User, { username: email });
+            const user = yield Users_1.User.findOne({ where: { username: email } });
             if (!user) {
                 return true;
             }
@@ -134,7 +132,7 @@ let UserResolver = class UserResolver {
             return true;
         });
     }
-    RegisterUser(options, { em }) {
+    RegisterUser(options) {
         return __awaiter(this, void 0, void 0, function* () {
             if (!email_validator_1.default.validate(options.username)) {
                 return {
@@ -159,25 +157,25 @@ let UserResolver = class UserResolver {
             const hashedPassword = yield argon2_1.default.hash(options.password);
             let user;
             try {
-                const result = yield em
-                    .createQueryBuilder(Users_1.User)
-                    .getKnexQuery()
-                    .insert({
+                const result = yield typeorm_1.getConnection()
+                    .createQueryBuilder()
+                    .insert()
+                    .into(Users_1.User)
+                    .values({
                     username: options.username,
                     password: hashedPassword,
-                    created_at: new Date(),
-                    updated_at: new Date(),
                 })
-                    .returning("*");
-                user = result[0];
+                    .returning("*")
+                    .execute();
+                user = result.raw[0];
             }
             catch (err) {
-                if (err.message.includes(`returning "id" - duplicate key value violates unique constraint "user_username_unique"`)) {
+                if (err.code === "23505") {
                     return {
                         error: [
                             {
                                 field: "username",
-                                message: "Provided email is already assosciated with another account.",
+                                message: "username already taken",
                             },
                         ],
                     };
@@ -185,19 +183,21 @@ let UserResolver = class UserResolver {
             }
             return {
                 user,
+                error: undefined,
             };
         });
     }
-    AllUsers({ em }) {
+    AllUsers() {
         return __awaiter(this, void 0, void 0, function* () {
-            const users = yield em.find(Users_1.User, {});
-            return users;
+            return Users_1.User.find();
         });
     }
-    login(options, { em, req }) {
+    login(options, { req }) {
         return __awaiter(this, void 0, void 0, function* () {
-            const user = yield em.findOne(Users_1.User, {
-                username: options.username.toLowerCase(),
+            const user = yield Users_1.User.findOne({
+                where: {
+                    username: options.username.toLowerCase(),
+                },
             });
             if (!user) {
                 return {
@@ -243,7 +243,7 @@ __decorate([
     __param(0, type_graphql_1.Ctx()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Object]),
-    __metadata("design:returntype", Promise)
+    __metadata("design:returntype", void 0)
 ], UserResolver.prototype, "me", null);
 __decorate([
     type_graphql_1.Mutation(() => AuthResponse),
@@ -256,8 +256,7 @@ __decorate([
 ], UserResolver.prototype, "changePassword", null);
 __decorate([
     type_graphql_1.Mutation(() => Boolean),
-    __param(0, type_graphql_1.Arg("email")),
-    __param(1, type_graphql_1.Ctx()),
+    __param(0, type_graphql_1.Arg("email")), __param(1, type_graphql_1.Ctx()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [String, Object]),
     __metadata("design:returntype", Promise)
@@ -265,16 +264,14 @@ __decorate([
 __decorate([
     type_graphql_1.Mutation(() => AuthResponse),
     __param(0, type_graphql_1.Arg("options")),
-    __param(1, type_graphql_1.Ctx()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [EmailPasswordInput, Object]),
+    __metadata("design:paramtypes", [EmailPasswordInput]),
     __metadata("design:returntype", Promise)
 ], UserResolver.prototype, "RegisterUser", null);
 __decorate([
     type_graphql_1.Query(() => [Users_1.User]),
-    __param(0, type_graphql_1.Ctx()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [Object]),
+    __metadata("design:paramtypes", []),
     __metadata("design:returntype", Promise)
 ], UserResolver.prototype, "AllUsers", null);
 __decorate([
