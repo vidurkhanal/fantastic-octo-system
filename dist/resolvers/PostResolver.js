@@ -25,6 +25,20 @@ exports.PostResolver = void 0;
 const Post_1 = require("../entities/Post");
 const type_graphql_1 = require("type-graphql");
 const typeorm_1 = require("typeorm");
+const isAuth_1 = require("../middleware/isAuth");
+let PostInput = class PostInput {
+};
+__decorate([
+    type_graphql_1.Field(),
+    __metadata("design:type", String)
+], PostInput.prototype, "title", void 0);
+__decorate([
+    type_graphql_1.Field(),
+    __metadata("design:type", String)
+], PostInput.prototype, "content", void 0);
+PostInput = __decorate([
+    type_graphql_1.InputType()
+], PostInput);
 let PostResolver = class PostResolver {
     AllPosts() {
         return Post_1.Post.find();
@@ -32,14 +46,16 @@ let PostResolver = class PostResolver {
     PostById(id) {
         return Post_1.Post.findOne(id);
     }
-    CreatePost(title) {
+    CreatePost(options, { req }) {
         return __awaiter(this, void 0, void 0, function* () {
             const result = yield typeorm_1.getConnection()
                 .createQueryBuilder()
                 .insert()
                 .into(Post_1.Post)
                 .values({
-                title,
+                title: options.title,
+                content: options.content,
+                creatorID: req.session.userId,
             })
                 .returning("*")
                 .execute();
@@ -85,9 +101,11 @@ __decorate([
 ], PostResolver.prototype, "PostById", null);
 __decorate([
     type_graphql_1.Mutation(() => Post_1.Post),
-    __param(0, type_graphql_1.Arg("title")),
+    type_graphql_1.UseMiddleware(isAuth_1.isAuth),
+    __param(0, type_graphql_1.Arg("options")),
+    __param(1, type_graphql_1.Ctx()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String]),
+    __metadata("design:paramtypes", [PostInput, Object]),
     __metadata("design:returntype", Promise)
 ], PostResolver.prototype, "CreatePost", null);
 __decorate([
