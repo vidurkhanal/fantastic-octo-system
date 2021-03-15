@@ -8,6 +8,9 @@ import {
   Field,
   Ctx,
   UseMiddleware,
+  Int,
+  FieldResolver,
+  Root,
 } from "type-graphql";
 import { getConnection } from "typeorm";
 import { MyContext } from "../types";
@@ -21,11 +24,32 @@ class PostInput {
   content: string;
 }
 
-@Resolver()
+@Resolver(Post)
 export class PostResolver {
+  @FieldResolver(() => String)
+  textSnippet(@Root() root: Post) {
+    return root.content.slice(0, 50) + "...";
+  }
+
   @Query(() => [Post])
-  AllPosts(): Promise<Post[]> {
-    return Post.find();
+  AllPosts(
+    @Arg("limit", () => Int) limit: number,
+    @Arg("cursor", () => String, { nullable: true }) cursor: string | null
+  ): Promise<Post[]> {
+    const realLimit = Math.min(50, limit);
+    let qb = getConnection()
+      .getRepository(Post)
+      .createQueryBuilder("p")
+      .orderBy('"createdAt"', "DESC")
+      .take(realLimit);
+
+    if (cursor) {
+      qb = qb.where('"createdAt"<:cursor', {
+        cursor: new Date(parseInt(cursor)),
+      });
+    }
+
+    return qb.getMany();
   }
 
   @Query(() => Post, { nullable: true })
